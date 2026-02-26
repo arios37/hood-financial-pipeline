@@ -1169,13 +1169,13 @@ def build_balance_sheet(
         # Payables = Revenue × pay_pct
         _write_fcst_cell(ws, BS_ROW["Payables"], bs_col, f"={is_rev}*{pay_pct}")
 
-        # Total Debt = bounded revolver draw/no-repay mechanic
-        # Draw when cash_raw < min_cash; bounded by [min_debt, max_debt] assumptions.
-        # NOTE: this is a draw-only revolver — debt never automatically repays.
-        # See docstring for circular-reference hazard warning.
+        # Total Debt = draw-only revolver (never repays)
+        # Draw when cash_raw < min_cash; floored at min_debt.
+        # No max_debt cap — avoids phantom paydowns when historical debt
+        # (dominated by securities-lending collateral) exceeds the cap.
         _write_fcst_cell(ws, BS_ROW["Total Debt"], bs_col,
-                         f"=MAX({min_debt},MIN({max_debt},"
-                         f"{prev_let}{BS_ROW['Total Debt']}+MAX(0,{min_cash}-{cash_raw})))",
+                         f"=MAX({min_debt},"
+                         f"{prev_let}{BS_ROW['Total Debt']}+MAX(0,{min_cash}-{cash_raw}))",
                          bold=True, border=BORDER_BOTTOM_MED)
 
         # Equity = prior Equity + Net Income
