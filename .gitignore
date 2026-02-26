@@ -1,0 +1,40 @@
+# Virtual environment
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data & output (keep structure, ignore contents)
+data/*
+!data/.gitkeep
+output/*
+!output/.gitkeep
+
+# SEC filing downloads (re-fetchable via `make extract`)
+sec_downloads/
+sec_financial_reports/
+
+# Pytest cache
+.pytest_cache/
+
+# Logs
+*.log

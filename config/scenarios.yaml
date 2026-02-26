@@ -1,0 +1,37 @@
+# HOOD Financial Model — Named Scenario Overrides
+# Each scenario specifies only the assumption keys that differ from defaults.
+# Keys match the fourth element of each ASSUMPTIONS_SPEC tuple.
+# Run: python src/hood_model/build_excel_model.py --scenario bull
+
+bull:
+  txn_growth_y1: 0.40
+  txn_growth_y2: 0.35
+  txn_growth_y3: 0.28
+  txn_growth_y4: 0.22
+  ni_growth_y1:  0.25
+  ni_growth_y2:  0.20
+  ni_growth_y3:  0.15
+  ni_growth_y4:  0.10
+  other_growth_y1: 0.30
+  opex_pct: 0.38
+  wacc: 0.10
+  terminal_growth: 0.035
+
+base: {}  # all defaults — no overrides
+
+bear:
+  txn_growth_y1: 0.10
+  txn_growth_y2: 0.08
+  txn_growth_y3: 0.05
+  txn_growth_y4: 0.03
+  ni_growth_y1:  0.05
+  ni_growth_y2:  0.03
+  ni_growth_y3:  0.02
+  ni_growth_y4:  0.00
+  other_growth_y1: 0.08
+  other_growth_y2: 0.05
+  other_growth_y3: 0.03
+  other_growth_y4: 0.02
+  opex_pct: 0.48
+  wacc: 0.14
+  terminal_growth: 0.02
