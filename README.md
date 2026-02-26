@@ -1,5 +1,7 @@
 # HOOD Financial Pipeline
 
+[![CI](https://github.com/arios37/hood-financial-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/arios37/hood-financial-pipeline/actions/workflows/ci.yml)
+
 A Python pipeline that automates the extraction of Robinhood (HOOD) SEC filings and constructs a professional three-statement financial model in Excel, complete with historical data, four-year forecasts, DCF/exit-multiple valuations, sensitivity analysis, and model integrity checks.
 
 ```
