@@ -1136,7 +1136,6 @@ def build_balance_sheet(
     pay_pct     = cell_refs["pay_pct"]
     min_cash    = cell_refs["min_cash"]
     min_debt    = cell_refs["min_debt"]
-    max_debt    = cell_refs["max_debt"]
 
     rev_is_r = IS_ROW["Total Revenue"]
     ni_is_r  = IS_ROW["Net Income"]
