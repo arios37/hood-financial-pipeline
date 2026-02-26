@@ -17,13 +17,25 @@ SEC EDGAR API --> hood_sec_extract_v3.py --> hood_data_transform.py --> build_ex
 
 ![Income Statement](assets/income_statement.png)
 
-**Sensitivity Analysis** — Three 5x5 matrices for FCF, Net Income, and Revenue:
+**Balance Sheet** — Historical + forecast; cash rolls from FCF, debt as revolver plug, equity updated for NI:
 
-![Sensitivity Analysis](assets/sensitivity_analysis.png)
+![Balance Sheet](assets/balance_sheet.png)
+
+**Cash Flow** — CFO = NI + SBC + D&A - dWC; FCF = CFO - Capex; cash bridge reconciliation:
+
+![Cash Flow](assets/cash_flow.png)
 
 **Valuation** — DCF, exit multiples, and implied share price:
 
 ![Valuation Analysis](assets/valuation_analysis.png)
+
+**Sensitivity Analysis** — Three 5x5 matrices for FCF, Net Income, and Revenue:
+
+![Sensitivity Analysis](assets/sensitivity_analysis.png)
+
+**Model Guide** — Navigation, key assumptions summary, and limitations:
+
+![Model Guide](assets/model_guide.png)
 
 ## What It Does
 
