@@ -9,31 +9,33 @@ SEC EDGAR API --> hood_sec_extract_v3.py --> hood_data_transform.py --> build_ex
 
 ## Screenshots
 
-**Assumptions Sheet** — All model inputs with yellow-highlighted cells and blue input text:
+> Rendered via LibreOffice from the generated Excel workbook — all formulas fully evaluated.
 
-![Assumptions Sheet](assets/assumptions_sheet.png)
+**Assumptions** — Growth rates, cost structure, tax schedule, NOL tracking, working capital drivers, and valuation inputs (yellow = editable):
 
-**Income Statement** — 14 quarters historical + 4-year forecast (light blue columns):
+![Assumptions](assets/assumptions_sheet.png)
+
+**Income Statement** — 14 quarters of actuals (Q3 2022 – Q4 2025) plus 4-year forecast with per-segment revenue, margin analysis, and EPS:
 
 ![Income Statement](assets/income_statement.png)
 
-**Balance Sheet** — Historical + forecast; cash rolls from FCF, debt as revolver plug, equity updated for NI:
+**Balance Sheet** — Historical + forecast with partial balance sheet check, credit metrics (Debt/EBITDA, Net Debt/EBITDA), and audit notes:
 
 ![Balance Sheet](assets/balance_sheet.png)
 
-**Cash Flow** — CFO = NI + SBC + D&A - dWC; FCF = CFO - Capex; cash bridge reconciliation:
+**Cash Flow** — CFO = NI + SBC + D&A - dWC; FCF = CFO - Capex; cash bridge reconciliation (dCash = FCF + dDebt + Other):
 
 ![Cash Flow](assets/cash_flow.png)
 
-**Valuation** — DCF, exit multiples, and implied share price:
+**Valuation** — DCF (Gordon Growth terminal), exit multiple analysis (EV/EBITDA and EV/Revenue), implied share price summary, and WACC x TGR sensitivity with conditional formatting:
 
-![Valuation Analysis](assets/valuation_analysis.png)
+![Valuation](assets/valuation_analysis.png)
 
-**Sensitivity Analysis** — Three 5x5 matrices for FCF, Net Income, and Revenue:
+**Sensitivity Analysis** — Three 5x5 two-way matrices: FCF, Net Income, and Total Revenue across transaction growth and OpEx/NI growth scenarios:
 
 ![Sensitivity Analysis](assets/sensitivity_analysis.png)
 
-**Model Guide** — Navigation, key assumptions summary, and limitations:
+**Model Guide** — Sheet navigation, key assumption defaults with valid ranges, and model limitations/disclaimers:
 
 ![Model Guide](assets/model_guide.png)
 
