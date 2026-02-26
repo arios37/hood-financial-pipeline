@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import REPO_ROOT, DATA_DIR, TICKER
+from config import DATA_DIR, TICKER
 
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -395,7 +395,7 @@ def main() -> None:
     missing = [str(f) for f in INPUT_FILES.values() if not os.path.exists(f)]
     if missing:
         raise FileNotFoundError(
-            f"Missing input file(s):\n"
+            "Missing input file(s):\n"
             + "\n".join(f"  - {f}" for f in missing)
             + "\n\nThese CSVs are produced by the SEC extraction step.\n"
             "Run:  python -m src.hood_sec_extract_v3 --ticker HOOD --quarters 10"

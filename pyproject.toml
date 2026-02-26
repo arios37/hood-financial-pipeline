@@ -14,3 +14,10 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/build_excel_model.py" = ["E501", "E702", "E402", "E741"]
+"src/hood_sec_extract_v3.py" = ["E501", "E702", "E402"]
+"src/validate_model.py" = ["E501", "E402"]
+"src/hood_data_transform.py" = ["E402"]
+"tests/test_pipeline.py" = ["E501"]

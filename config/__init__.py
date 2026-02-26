@@ -8,24 +8,24 @@ Why this exists:
 """
 
 from config.config import (  # noqa: F401
-    TICKER,
-    REPO_ROOT,
+    BS_FCST_COL_START,
+    BS_ROW,
+    CF_FCST_COL_START,
+    CF_ROW,
     DATA_DIR,
-    OUTPUT_DIR,
     EXPECTED_SHEETS,
-    LABEL_COL,
+    FCST_YEARS,
     HIST_COL_START,
-    NUM_IS_HIST,
+    IS_FCST_COL,
+    IS_FCST_COL_START,
+    IS_ROW,
+    LABEL_COL,
     NUM_BS_CF_HIST,
     NUM_FCST_COLS,
-    FCST_YEARS,
-    IS_FCST_COL_START,
-    BS_FCST_COL_START,
-    CF_FCST_COL_START,
-    IS_FCST_COL,
-    IS_ROW,
-    BS_ROW,
-    CF_ROW,
+    NUM_IS_HIST,
+    OUTPUT_DIR,
+    REPO_ROOT,
+    TICKER,
 )
 
 __all__ = [

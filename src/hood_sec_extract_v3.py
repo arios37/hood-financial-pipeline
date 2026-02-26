@@ -100,7 +100,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import REPO_ROOT, DATA_DIR, TICKER
+from config import DATA_DIR, REPO_ROOT, TICKER
 
 DATA_DIR.mkdir(exist_ok=True)
 

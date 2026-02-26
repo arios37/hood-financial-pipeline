@@ -77,14 +77,16 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 from config import (
-    DATA_DIR, OUTPUT_DIR, TICKER,
+    BS_FCST_COL_START,
+    BS_ROW,
+    CF_FCST_COL_START,
+    CF_ROW,
+    DATA_DIR,
     EXPECTED_SHEETS,
     IS_FCST_COL,
     IS_ROW,
-    BS_ROW,
-    CF_ROW,
-    BS_FCST_COL_START,
-    CF_FCST_COL_START,
+    OUTPUT_DIR,
+    TICKER,
 )
 
 EXCEL_PATH = OUTPUT_DIR / f"{TICKER}_Financial_Model.xlsx"

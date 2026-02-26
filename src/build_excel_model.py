@@ -116,17 +116,25 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir))
 from config import (
-    REPO_ROOT, DATA_DIR, OUTPUT_DIR, TICKER,
-    LABEL_COL, HIST_COL_START, NUM_FCST_COLS, FCST_YEARS,
-    IS_ROW, BS_ROW, CF_ROW,
+    BS_ROW,
+    CF_ROW,
+    DATA_DIR,
+    FCST_YEARS,
+    HIST_COL_START,
+    IS_ROW,
+    LABEL_COL,
+    NUM_FCST_COLS,
+    OUTPUT_DIR,
+    REPO_ROOT,
+    TICKER,
 )
 
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, FormulaRule
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
@@ -2762,6 +2770,7 @@ def main() -> None:
         None (exits with code 1 on validation failure, 0 on success).
     """
     import argparse
+
     import yaml
 
     parser = argparse.ArgumentParser(description="Build HOOD Excel Model")

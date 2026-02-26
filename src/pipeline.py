@@ -22,12 +22,13 @@ from __future__ import annotations
 import logging
 import sys
 
+from src.build_excel_model import main as build_model
+from src.hood_data_transform import main as transform
+
 # -- Stage imports --
 # Each stage exposes a ``main()`` function that can be called standalone.
 # We alias them here for readability within the orchestration loop.
 from src.hood_sec_extract_v3 import main as extract
-from src.hood_data_transform import main as transform
-from src.build_excel_model import main as build_model
 from src.validate_model import main as validate
 
 logger = logging.getLogger(__name__)

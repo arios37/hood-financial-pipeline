@@ -17,7 +17,6 @@ Note:
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -26,17 +25,16 @@ import yaml
 from openpyxl import load_workbook
 
 from config import (
-    DATA_DIR,
-    EXPECTED_SHEETS,
-    OUTPUT_DIR,
-    TICKER,
-    IS_ROW,
     BS_ROW,
     CF_ROW,
+    DATA_DIR,
+    EXPECTED_SHEETS,
+    IS_ROW,
+    OUTPUT_DIR,
+    TICKER,
 )
+from src.build_excel_model import ASSUMPTIONS_SPEC
 from src.pipeline import run_pipeline
-from src.hood_data_transform import main as transform
-from src.build_excel_model import main as build_model, ASSUMPTIONS_SPEC
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -261,12 +259,12 @@ class TestManifest:
     def test_manifest_bs_periods_match_csv(self, manifest, df_bs):
         expected = manifest["statements"]["BS"]["periods"]
         actual = list(df_bs.columns)
-        assert actual == expected, f"BS periods mismatch"
+        assert actual == expected, "BS periods mismatch"
 
     def test_manifest_cf_periods_match_csv(self, manifest, df_cf):
         expected = manifest["statements"]["CF"]["periods"]
         actual = list(df_cf.columns)
-        assert actual == expected, f"CF periods mismatch"
+        assert actual == expected, "CF periods mismatch"
 
     def test_manifest_has_timestamp(self, manifest):
         """Manifest includes a generated_at timestamp."""
