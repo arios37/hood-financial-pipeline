@@ -1962,12 +1962,16 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
     rev_tag  = _resolve_is_tag(["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"])
     opex_tag = _resolve_is_tag(["OperatingExpenses"])
     ni_tag   = _resolve_is_tag(["NetIncomeLoss"])
+    cogs_tag = _resolve_is_tag(["CostOfRevenue", "CostOfGoodsAndServicesSold"])
+    tax_tag  = _resolve_is_tag(["IncomeTaxExpenseBenefit"])
 
     rev_long  = _derive_or_empty(rev_tag,  "Total Revenue")
     opex_long = _derive_or_empty(opex_tag, "Operating Expenses")
     ni_long   = _derive_or_empty(ni_tag,   "Net Income")
+    cogs_long = _derive_or_empty(cogs_tag, "Cost of Revenue")
+    tax_long  = _derive_or_empty(tax_tag,  "Tax Provision")
 
-    _is_parts = [df for df in [rev_long, opex_long, sbc_q, ni_long] if not df.empty]
+    _is_parts = [df for df in [rev_long, cogs_long, opex_long, sbc_q, tax_long, ni_long] if not df.empty]
     _is_merged = _is_parts[0].copy() if _is_parts else pd.DataFrame(columns=["end"])
     for _part in _is_parts[1:]:
         _is_merged = _is_merged.merge(_part, on="end", how="outer")
@@ -1983,11 +1987,11 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
 
     _is_merged = _is_merged.head(quarters + 4)   # +4 to accommodate added Q4 rows
 
-    # --------------- D&A Calibration Log ---------------
-    # D&A is not extracted as a separate line item (HOOD's XBRL reporting is
-    # inconsistent for this tag). Search for known tags; if found, compute the
-    # historical ratio so users can calibrate the da_pct Assumption.
+    # --------------- D&A Extraction + Calibration ---------------
+    # Extract D&A as a CF line item (add-back in indirect method CFO).
+    # Also compute historical D&A/Revenue ratio for calibration logging.
     _da_tags = search_tags(facts, r"DepreciationAndAmortization")
+    da_series_for_cf: Optional[pd.DataFrame] = None
     if _da_tags and not rev_long.empty:
         _da_tag = _da_tags[0]
         try:
@@ -2004,6 +2008,11 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
                         "Compare against the da_pct assumption (default 3%%).",
                         _da_tag, _ratios.mean() * 100,
                     )
+                # Build a quarterly D&A series for CF output
+                da_series_for_cf = _da_long.rename(columns={_da_tag: "Depreciation & Amortization"})
+                da_series_for_cf["Depreciation & Amortization"] = pd.to_numeric(
+                    da_series_for_cf["Depreciation & Amortization"], errors="coerce"
+                )
         except Exception as _e:
             logger.debug("  [D&A] Could not extract D&A for calibration: %s", _e)
     else:
@@ -2023,10 +2032,14 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
     is_rep = pd.DataFrame([
         {"Statement Line": "Total Revenue",           "Resolved Tag": rev_tag  or "",
          "Reason": "preferred+Q4_derived",           "Taxonomy": "us-gaap", "Unit": "USD"},
+        {"Statement Line": "Cost of Revenue",         "Resolved Tag": cogs_tag or "",
+         "Reason": "preferred+Q4_derived",           "Taxonomy": "us-gaap", "Unit": "USD"},
         {"Statement Line": "Operating Expenses",      "Resolved Tag": opex_tag or "",
          "Reason": "preferred+Q4_derived",           "Taxonomy": "us-gaap", "Unit": "USD"},
         {"Statement Line": "Stock-Based Compensation","Resolved Tag": "ShareBasedCompensation",
          "Reason": "ytd_to_quarterly+Q4_derived",    "Taxonomy": "us-gaap", "Unit": "USD"},
+        {"Statement Line": "Tax Provision",           "Resolved Tag": tax_tag  or "",
+         "Reason": "preferred+Q4_derived",           "Taxonomy": "us-gaap", "Unit": "USD"},
         {"Statement Line": "Net Income",              "Resolved Tag": ni_tag   or "",
          "Reason": "preferred+Q4_derived",           "Taxonomy": "us-gaap", "Unit": "USD"},
     ])
@@ -2070,11 +2083,12 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
     bs_tbl, bs_rep = build_companyfacts_statement(facts, bs_specs, quarters=quarters)
 
     # --------------- Cash Flow (Quarterly) ---------------
-    # Net income + SBC can be taken directly (often quarter-based).
+    # Net income uses derive_q4_from_annual so Q4 (from 10-K) is included.
     # CFO + Capex are commonly YTD in 10-Q, so convert to quarterly increments.
 
-    ni_raw = extract_quarterly_fact(facts, "NetIncomeLoss", taxonomy="us-gaap", unit="USD").head(quarters)
-    ni_series = ni_raw.rename(columns={"quarter_end": "end", "NetIncomeLoss": "Net Income"})
+    ni_series = derive_q4_from_annual(
+        facts, "NetIncomeLoss", taxonomy="us-gaap", unit="USD"
+    ).rename(columns={"NetIncomeLoss": "Net Income"})
 
     # SBC already computed above as sbc_q (YTD-corrected, Q4 derived from 10-K).
     sbc_series = sbc_q  # columns: [end, Stock-Based Compensation]
@@ -2115,6 +2129,9 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
         .merge(capex_q, on="end", how="outer")
         .sort_values("end")
     )
+    # Merge D&A if extracted
+    if da_series_for_cf is not None and not da_series_for_cf.empty:
+        cf_long = cf_long.merge(da_series_for_cf[["end", "Depreciation & Amortization"]], on="end", how="outer").sort_values("end")
 
     # Keep 10-Q report dates AND Dec 31 year-end dates (Q4 derived from 10-K annual data).
     if report_dates_10q:
@@ -2138,6 +2155,8 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
     cf_rows = []
     cf_rows.append(wide_from_series(cf_long, "Net Income", "end", "Net Income", quarters))
     cf_rows.append(wide_from_series(cf_long, "Stock-Based Compensation", "end", "Stock-Based Compensation", quarters))
+    if "Depreciation & Amortization" in cf_long.columns:
+        cf_rows.append(wide_from_series(cf_long, "Depreciation & Amortization", "end", "Depreciation & Amortization", quarters))
     cf_rows.append(
         wide_from_series(cf_long, "Cash From Operations (CFO)", "end", "Cash From Operations (CFO)", quarters))
     cf_rows.append(wide_from_series(cf_long, "Capex (Productive Assets)", "end", "Capex (Productive Assets)", quarters))
@@ -2151,6 +2170,9 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
              "Taxonomy": "us-gaap", "Unit": "USD"},
             {"Statement Line": "Stock-Based Compensation", "Resolved Tag": "ShareBasedCompensation",
              "Reason": "preferred", "Taxonomy": "us-gaap", "Unit": "USD"},
+            {"Statement Line": "Depreciation & Amortization",
+             "Resolved Tag": _da_tags[0] if _da_tags else "",
+             "Reason": "preferred|balance_sheet_style", "Taxonomy": "us-gaap", "Unit": "USD"},
             {"Statement Line": "Cash From Operations (CFO)",
              "Resolved Tag": "NetCashProvidedByUsedInOperatingActivities", "Reason": "preferred|ytd_to_quarterly",
              "Taxonomy": "us-gaap", "Unit": "USD"},
@@ -2168,13 +2190,14 @@ def run_companyfacts_pipeline(ticker: str, cik10: str, quarters: int) -> Tuple[p
     # filters fp to "Q*" records, silently dropping BS tags filed under fp=FY or
     # non-standard labels. HOOD is a broker-dealer; standard debt tags may not capture
     # securities-lending or credit-facility liabilities.
+    # Corporate debt only — excludes SecuritiesLoaned and PayablesToBrokerDealers
+    # which are operational brokerage liabilities offset by corresponding assets.
+    # Including them inflated Net Debt by $3-15B and distorted the equity bridge.
     _debt_tags = [
         "LongTermDebt",
         "LongTermDebtNoncurrent",
         "ConvertibleNotesPayable",
         "ConvertibleDebtNoncurrent",
-        "SecuritiesLoaned",
-        "PayablesToBrokerDealersAndClearingOrganizations",
     ]
     debt_proxy = sum_balance_sheet_facts(
         facts,

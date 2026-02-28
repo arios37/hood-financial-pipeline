@@ -265,11 +265,27 @@ ASSUMPTIONS_SPEC = [
     ("  FY2028E Growth %",               0.12,  True,  "other_growth_y3"),
     ("  FY2029E Growth %",               0.10,  True,  "other_growth_y4"),
     None,
-    # ---- Cost Structure ----
-    ("Cost Structure",                   None,  False, None),
-    ("  Op. Expenses % of Rev (ex. SBC)", 0.42, True,  "opex_pct"),
-    ("  Stock-Based Compensation % of Rev", 0.08, True, "sbc_pct"),
-    ("  Depreciation & Amortization % of Rev", 0.03, True, "da_pct"),
+    # ---- Cost of Revenue ----
+    ("Cost of Revenue  (txn rebates, clearing, execution costs)", None, False, None),
+    ("  Cost of Revenue % of Rev",       0.15,  True,  "cogs_pct"),
+    None,
+    # ---- Operating Expenses (ex. SBC) — declining with operating leverage ----
+    ("Op. Expenses % of Rev (ex. SBC — declining with scale)", None, False, None),
+    ("  FY2026E OpEx %",                 0.42,  True,  "opex_pct_y1"),
+    ("  FY2027E OpEx %",                 0.40,  True,  "opex_pct_y2"),
+    ("  FY2028E OpEx %",                 0.38,  True,  "opex_pct_y3"),
+    ("  FY2029E OpEx %",                 0.37,  True,  "opex_pct_y4"),
+    None,
+    # ---- Stock-Based Compensation — declining with scale ----
+    ("Stock-Based Compensation % of Rev (declining with scale)", None, False, None),
+    ("  FY2026E SBC %",                  0.07,  True,  "sbc_pct_y1"),
+    ("  FY2027E SBC %",                  0.065, True,  "sbc_pct_y2"),
+    ("  FY2028E SBC %",                  0.06,  True,  "sbc_pct_y3"),
+    ("  FY2029E SBC %",                  0.06,  True,  "sbc_pct_y4"),
+    None,
+    # ---- D&A ----
+    ("Depreciation & Amortization",      None,  False, None),
+    ("  D&A % of Rev",                   0.03,  True,  "da_pct"),
     None,
     # ---- Tax Schedule ----
     ("Tax Schedule  (NOL-adjusted effective rates)", None, False, None),
@@ -285,10 +301,10 @@ ASSUMPTIONS_SPEC = [
     None,
     # ---- Working Capital ----
     ("Working Capital Drivers",          None,  False, None),
-    ("  Receivables % of Revenue",       0.36,  True,  "recv_pct"),
+    ("  Receivables & Settlement Assets % of Rev", 0.36, True, "recv_pct"),
     ("  Payables % of Revenue",          0.34,  True,  "pay_pct"),
     ("  Minimum Cash Balance ($M)",     500.0,  False, "min_cash"),
-    ("  Capital Expenditures % of Rev",  0.003, True,  "capex_pct"),
+    ("  Capital Expenditures % of Rev",  0.01,  True,  "capex_pct"),
     None,
     # ---- Other Income ----
     ("Other Income  (corporate interest + non-operating)", None, False, None),
@@ -304,6 +320,7 @@ ASSUMPTIONS_SPEC = [
     ("  Terminal Growth Rate",           0.03,  True,  "terminal_growth"),
     ("  Exit EV / EBITDA Multiple",      20.0,  False, "exit_ebitda_mult"),
     ("  Exit EV / Revenue Multiple",      5.0,  False, "exit_rev_mult"),
+    ("  Mid-Year Convention (1=Yes, 0=No)", 1.0, False, "mid_year"),
     None,
     # ---- Debt Limits ----
     # WARNING: removing or reordering these two rows will shift WACC/TGR row indices
@@ -384,6 +401,10 @@ def build_assumptions(ws, is_fcst_col_start: int, hist_recv_pct=None, hist_pay_p
         if key:
             cell_refs[key] = f"Assumptions!$B${row}"
 
+        # Track NOL note position (spacer row after tax_rate_y4)
+        if key == "tax_rate_y4":
+            _nol_note_row = row + 1   # the None spacer immediately after
+
         # Historical WC calibration notes (column C)
         if key == "recv_pct" and hist_recv_pct is not None:
             c = ws.cell(row=row, column=3)
@@ -396,14 +417,14 @@ def build_assumptions(ws, is_fcst_col_start: int, hist_recv_pct=None, hist_pay_p
 
         row += 1
 
-    # NOL context note at row 32 (the None spacer row after the Tax Schedule section)
-    nol_c = ws.cell(row=32, column=1)
+    # NOL context note on the spacer row after tax_rate_y4
+    nol_c = ws.cell(row=_nol_note_row, column=1)
     nol_c.value = (
         "HOOD reported ~$2B NOL carryforward. Effective tax rate ramps from ~5% (FY2026E) "
         "to statutory 21% (FY2029E) as the NOL is consumed."
     )
     nol_c.font = FONT_NOTE
-    ws.merge_cells("A32:B32")
+    ws.merge_cells(f"A{_nol_note_row}:B{_nol_note_row}")
 
     # ---- NOL Depletion Schedule (memo, rows 54–59) ----
     nol_memo_row = row   # row = 54 after loop
@@ -697,12 +718,14 @@ def build_income_statement(
         (IS_ROW["NI Revenue"],         "  Net Interest Rev",        FONT_FORMULA),
         (IS_ROW["Other Revenue"],      "  Other Revenue",           FONT_FORMULA),
         (IS_ROW["Total Revenue"],      "Total Revenue",             FONT_BOLD),
+        (IS_ROW["Cost of Revenue"],    "  Cost of Revenue",         FONT_FORMULA),
+        (IS_ROW["Gross Profit"],       "Gross Profit",              FONT_BOLD),
         (IS_ROW["Operating Expenses"], "  Op. Exp. (ex. SBC) †",   FONT_FORMULA),
         (IS_ROW["SBC"],                "  Stock-Based Comp.",       FONT_FORMULA),
         (IS_ROW["Total Costs"],        "Total Operating Costs",     FONT_BOLD),
         (IS_ROW["Operating Income"],   "Operating Income",          FONT_BOLD),
         (IS_ROW["Tax Provision"],      "  Tax Provision",           FONT_FORMULA),
-        (IS_ROW["Below-the-line"],     "  Below-the-line / Other",  FONT_FORMULA),
+        (IS_ROW["Other Income"],       "  Other Income",            FONT_FORMULA),
         (IS_ROW["Net Income"],         "Net Income",                FONT_BOLD),
         (IS_ROW["EPS"],                "  Diluted EPS",             FONT_FORMULA),
     ]
@@ -714,12 +737,14 @@ def build_income_statement(
     # ---- Historical actuals ----
     # Raw CSV rows written directly (all except Operating Expenses)
     hist_map = {
-        IS_ROW["Txn Revenue"]:   "Transaction-based Revenue",
-        IS_ROW["NI Revenue"]:    "Net Interest Revenue",
-        IS_ROW["Other Revenue"]: "Other Revenue",
-        IS_ROW["Total Revenue"]: "Total Revenue",
-        IS_ROW["SBC"]:           "Stock-Based Compensation",
-        IS_ROW["Net Income"]:    "Net Income",
+        IS_ROW["Txn Revenue"]:    "Transaction-based Revenue",
+        IS_ROW["NI Revenue"]:     "Net Interest Revenue",
+        IS_ROW["Other Revenue"]:  "Other Revenue",
+        IS_ROW["Total Revenue"]:  "Total Revenue",
+        IS_ROW["Cost of Revenue"]:"Cost of Revenue",
+        IS_ROW["SBC"]:            "Stock-Based Compensation",
+        IS_ROW["Tax Provision"]:  "Tax Provision",
+        IS_ROW["Net Income"]:     "Net Income",
     }
     for sheet_row, csv_label in hist_map.items():
         if csv_label not in df_is.index:
@@ -748,16 +773,27 @@ def build_income_statement(
 
     # Derived historical rows
     rev_r  = IS_ROW["Total Revenue"]
+    cogs_r = IS_ROW["Cost of Revenue"]
+    gp_r   = IS_ROW["Gross Profit"]
     opex_r = IS_ROW["Operating Expenses"]
     sbc_r  = IS_ROW["SBC"]
     tot_r  = IS_ROW["Total Costs"]
     oi_r   = IS_ROW["Operating Income"]
+    tax_r  = IS_ROW["Tax Provision"]
     ni_r   = IS_ROW["Net Income"]
-    btl_r  = IS_ROW["Below-the-line"]
+    oi_inc_r = IS_ROW["Other Income"]
 
     for hi in range(num_hist):
         col_idx = HIST_COL_START + hi
         letter  = cl(col_idx)
+
+        # Gross Profit = Revenue − Cost of Revenue
+        c = ws.cell(row=gp_r, column=col_idx)
+        c.value         = f"=IF({letter}{cogs_r}=\"\",{letter}{rev_r},{letter}{rev_r}-{letter}{cogs_r})"
+        c.font          = FONT_BOLD
+        c.number_format = NUM_CURRENCY
+        c.alignment     = Alignment(horizontal="right")
+        c.border        = BORDER_BOTTOM_MED
 
         # Total Operating Costs = OpEx(ex-SBC) + SBC = Total OpEx (correct, no double-count)
         c = ws.cell(row=tot_r, column=col_idx)
@@ -767,33 +803,33 @@ def build_income_statement(
         c.alignment     = Alignment(horizontal="right")
         c.border        = BORDER_BOTTOM_MED
 
-        # Operating Income = Revenue − Total Costs
+        # Operating Income = Gross Profit − Total Costs
         c = ws.cell(row=oi_r, column=col_idx)
-        c.value         = f"={letter}{rev_r}-{letter}{tot_r}"
+        c.value         = f"={letter}{gp_r}-{letter}{tot_r}"
         c.font          = FONT_BOLD
         c.number_format = NUM_CURRENCY
         c.alignment     = Alignment(horizontal="right")
         c.border        = BORDER_BOTTOM_MED
 
-        # Below-the-line / Other = NI − OI
-        # Captures income taxes, interest on corporate cash, and non-operating items.
-        c = ws.cell(row=btl_r, column=col_idx)
-        c.value         = f"={letter}{ni_r}-{letter}{oi_r}"
+        # Other Income = NI − OI − Tax (splits the old BTL plug into components)
+        # If Tax is empty for a period, falls back to NI − OI
+        c = ws.cell(row=oi_inc_r, column=col_idx)
+        c.value         = f"=IF({letter}{tax_r}=\"\",{letter}{ni_r}-{letter}{oi_r},{letter}{ni_r}-{letter}{oi_r}-{letter}{tax_r})"
         c.font          = FONT_FORMULA
         c.number_format = NUM_CURRENCY
         c.alignment     = Alignment(horizontal="right")
 
-    # Bold borders on Total Revenue and Net Income
+    # Bold borders on Total Revenue, Gross Profit, and Net Income
     for hi in range(num_hist):
         col_idx = HIST_COL_START + hi
-        ws.cell(row=rev_r, column=col_idx).border  = BORDER_BOTTOM_MED
-        ws.cell(row=ni_r,  column=col_idx).border  = BORDER_BOTTOM_DOUBLE
+        ws.cell(row=rev_r,  column=col_idx).border = BORDER_BOTTOM_MED
+        ws.cell(row=gp_r,   column=col_idx).border = BORDER_BOTTOM_MED
+        ws.cell(row=ni_r,   column=col_idx).border = BORDER_BOTTOM_DOUBLE
 
     # ---- Forecast formulas ----
-    opex_pct        = cell_refs["opex_pct"]
-    sbc_pct         = cell_refs["sbc_pct"]
+    cogs_pct_ref     = cell_refs["cogs_pct"]
     other_income_ref = cell_refs["other_income"]
-    shares_ref      = cell_refs["shares_diluted"]
+    shares_ref       = cell_refs["shares_diluted"]
 
     txn_r    = IS_ROW["Txn Revenue"]
     ni_r_seg = IS_ROW["NI Revenue"]
@@ -814,6 +850,8 @@ def build_income_statement(
         yr_ni_growth    = cell_refs[f"ni_growth_y{fi + 1}"]
         yr_other_growth = cell_refs[f"other_growth_y{fi + 1}"]
         yr_tax_rate     = cell_refs[f"tax_rate_y{fi + 1}"]
+        yr_opex_pct     = cell_refs[f"opex_pct_y{fi + 1}"]
+        yr_sbc_pct      = cell_refs[f"sbc_pct_y{fi + 1}"]
 
         # Revenue segments (each independently driven)
         if fi == 0:
@@ -834,32 +872,40 @@ def build_income_statement(
                          f"={letter}{txn_r}+{letter}{ni_r_seg}+{letter}{oth_r}",
                          bold=True, border=BORDER_BOTTOM_MED)
 
-        # Operating Expenses (ex. SBC) = Revenue × opex_pct
-        _write_fcst_cell(ws, opex_r, col_idx, f"={letter}{rev_r}*{opex_pct}")
+        # Cost of Revenue = Revenue × cogs_pct
+        _write_fcst_cell(ws, cogs_r, col_idx, f"={letter}{rev_r}*{cogs_pct_ref}")
 
-        # Stock-Based Compensation = Revenue × sbc_pct
-        _write_fcst_cell(ws, sbc_r, col_idx, f"={letter}{rev_r}*{sbc_pct}")
+        # Gross Profit = Revenue − COGS
+        _write_fcst_cell(ws, gp_r, col_idx,
+                         f"={letter}{rev_r}-{letter}{cogs_r}",
+                         bold=True, border=BORDER_BOTTOM_MED)
+
+        # Operating Expenses (ex. SBC) = Revenue × opex_pct (per-year, declining)
+        _write_fcst_cell(ws, opex_r, col_idx, f"={letter}{rev_r}*{yr_opex_pct}")
+
+        # Stock-Based Compensation = Revenue × sbc_pct (per-year, declining)
+        _write_fcst_cell(ws, sbc_r, col_idx, f"={letter}{rev_r}*{yr_sbc_pct}")
 
         # Total Costs
         _write_fcst_cell(ws, tot_r, col_idx,
                          f"={letter}{opex_r}+{letter}{sbc_r}",
                          bold=True, border=BORDER_BOTTOM_MED)
 
-        # Operating Income
+        # Operating Income = Gross Profit − Total Costs
         _write_fcst_cell(ws, oi_r, col_idx,
-                         f"={letter}{rev_r}-{letter}{tot_r}",
+                         f"={letter}{gp_r}-{letter}{tot_r}",
                          bold=True, border=BORDER_BOTTOM_MED)
 
         # Tax Provision = −MAX(OI, 0) × yr_tax_rate
-        _write_fcst_cell(ws, IS_ROW["Tax Provision"], col_idx,
+        _write_fcst_cell(ws, tax_r, col_idx,
                          f"=-MAX({letter}{oi_r},0)*{yr_tax_rate}")
 
-        # Below-the-line = other_income (corporate interest + other non-op income)
-        _write_fcst_cell(ws, btl_r, col_idx, f"={other_income_ref}")
+        # Other Income = corporate interest + non-operating items
+        _write_fcst_cell(ws, oi_inc_r, col_idx, f"={other_income_ref}")
 
-        # Net Income = OI + Tax + Below-the-line
+        # Net Income = OI + Tax + Other Income
         _write_fcst_cell(ws, ni_r, col_idx,
-                         f"={letter}{oi_r}+{letter}{IS_ROW['Tax Provision']}+{letter}{btl_r}",
+                         f"={letter}{oi_r}+{letter}{tax_r}+{letter}{oi_inc_r}",
                          bold=True, border=BORDER_BOTTOM_DOUBLE)
 
         # EPS = Net Income ($M) / Diluted Shares ($M) -> $ per share
@@ -880,21 +926,28 @@ def build_income_statement(
                    end_row=IS_ROW["margin_header"], end_column=total_cols)
 
     margin_labels = [
-        (IS_ROW["Op Margin"],  "  Operating Margin"),
-        (IS_ROW["Net Margin"], "  Net Margin"),
-        (IS_ROW["FCF Margin"], "  FCF Margin ‡"),
-        (IS_ROW["SBC Pct"],    "  SBC % Revenue"),
-        (IS_ROW["OpEx Pct"],   "  OpEx % Revenue (ex. SBC)"),
+        (IS_ROW["Gross Margin"], "  Gross Margin"),
+        (IS_ROW["Op Margin"],    "  Operating Margin"),
+        (IS_ROW["Net Margin"],   "  Net Margin"),
+        (IS_ROW["FCF Margin"],   "  FCF Margin ‡"),
+        (IS_ROW["SBC Pct"],      "  SBC % Revenue"),
+        (IS_ROW["OpEx Pct"],     "  OpEx % Revenue (ex. SBC)"),
     ]
     for sheet_row, label in margin_labels:
         style_cell(ws.cell(row=sheet_row, column=LABEL_COL), label,
                    font=FONT_FORMULA,
                    alignment=Alignment(horizontal="left", indent=1))
 
-    # Historical margins (Op and Net only — FCF requires CF cross-ref)
+    # Historical margins (Gross, Op, Net — FCF requires CF cross-ref)
     for hi in range(num_hist):
         col_idx = HIST_COL_START + hi
         letter  = cl(col_idx)
+
+        c = ws.cell(row=IS_ROW["Gross Margin"], column=col_idx)
+        c.value         = f"=IF({letter}{rev_r}=0,\"\",{letter}{gp_r}/{letter}{rev_r})"
+        c.number_format = NUM_PCT
+        c.font          = FONT_FORMULA
+        c.alignment     = Alignment(horizontal="right")
 
         c = ws.cell(row=IS_ROW["Op Margin"], column=col_idx)
         c.value         = f"={letter}{oi_r}/{letter}{rev_r}"
@@ -926,6 +979,9 @@ def build_income_statement(
         letter  = cl(col_idx)
         cf_let  = cl(cf_fcst_col_start + fi)
 
+        _write_fcst_cell(ws, IS_ROW["Gross Margin"], col_idx,
+                         f"={letter}{gp_r}/{letter}{rev_r}",
+                         num_format=NUM_PCT)
         _write_fcst_cell(ws, IS_ROW["Op Margin"], col_idx,
                          f"={letter}{oi_r}/{letter}{rev_r}",
                          num_format=NUM_PCT)
@@ -989,41 +1045,35 @@ def build_income_statement(
         c.alignment     = Alignment(horizontal="right")
 
     # ---- Footer notes ----
-    impl_note_row = IS_ROW["Implied Growth"] + 1
-    ltm_note_row  = IS_ROW["Implied Growth"] + 2
-    btl_note_row  = IS_ROW["Implied Growth"] + 3
-    opex_note_row = IS_ROW["Implied Growth"] + 4
+    note_row = IS_ROW["Implied Growth"] + 1
 
-    style_cell(ws.cell(row=impl_note_row, column=1),
-               "§ FY2026E = Total Rev ÷ LTM Total Rev − 1. FY2027E–FY2029E = current ÷ prior year − 1. "
-               "Total revenue growth reflects the weighted-average of independently-driven segment "
-               "growth rates (Transaction, Net Interest, Other).",
-               font=FONT_NOTE)
+    notes = [
+        "§ FY2026E = Total Rev / LTM Total Rev - 1. FY2027E-FY2029E = current / prior year - 1. "
+        "Total revenue growth reflects the weighted-average of independently-driven segment "
+        "growth rates (Transaction, Net Interest, Other).",
 
-    style_cell(ws.cell(row=ltm_note_row, column=1),
-               f"* LTM Revenue ({ltm_label}) is the annualized base for FY2026E. "
-               "Revenue Growth % applies to this 12-month total — not to any single quarter. "
-               "Quarterly YoY comparisons (e.g. Q3'24→Q3'25 = +100%) reflect operating momentum "
-               "and will naturally differ from the annual blended growth rate assumption.",
-               font=FONT_NOTE)
-    style_cell(ws.cell(row=btl_note_row, column=1),
-               "‡ FCF Margin historical: not shown (CF covers fewer periods than IS). "
-               "FCF Margin forecast cross-references the Cash Flow sheet.",
-               font=FONT_NOTE)
-    style_cell(ws.cell(row=opex_note_row, column=1),
-               "† Op. Exp. (ex. SBC): HOOD's reported OperatingExpenses XBRL tag includes SBC. "
-               "Historical values shown here are reported OpEx minus SBC to avoid double-counting. "
-               "Total Operating Costs = Op. Exp.(ex. SBC) + SBC = reported total. "
-               "Forecast opex_pct assumption (~42%) is calibrated ex-SBC; total opex ≈ 50% of revenue.",
-               font=FONT_NOTE)
+        f"* LTM Revenue ({ltm_label}) is the annualized base for FY2026E. "
+        "Revenue Growth % applies to this 12-month total, not to any single quarter.",
 
-    eps_note_row = opex_note_row + 1
-    style_cell(ws.cell(row=eps_note_row, column=1),
-               "** EPS = Net Income ($M) ÷ Diluted Shares Outstanding ($M). "
-               "Forecast only; historical EPS not extracted from XBRL. "
-               "Below-the-line in forecast = corporate interest income + other non-operating items "
-               "(held flat at Assumptions input). Historical BTL = NI − OI residual.",
-               font=FONT_NOTE)
+        "‡ FCF Margin historical: not shown (CF covers fewer periods than IS). "
+        "FCF Margin forecast cross-references the Cash Flow sheet.",
+
+        "† Op. Exp. (ex. SBC): HOOD's reported OperatingExpenses XBRL tag includes SBC. "
+        "Historical values shown here are reported OpEx minus SBC to avoid double-counting. "
+        "Forecast OpEx % steps down per year (42% to 37%) reflecting operating leverage.",
+
+        "** EPS = Net Income ($M) / Diluted Shares Outstanding ($M). "
+        "Forecast only; historical EPS not extracted from XBRL.",
+
+        "Other Income: Historical = NI - OI - Tax (derived). Forecast = flat assumption "
+        "(primarily corporate interest income on cash balance).",
+
+        "Cost of Revenue: transaction rebates, clearing costs, and execution costs. "
+        "If XBRL data unavailable for early periods, Gross Profit defaults to Total Revenue.",
+    ]
+    for note_text in notes:
+        style_cell(ws.cell(row=note_row, column=1), note_text, font=FONT_NOTE)
+        note_row += 1
 
 
 # ---------------------------------------------------------------------------
@@ -1124,7 +1174,7 @@ def build_balance_sheet(
     rows = [
         ("Cash & Cash Equivalents", True,  "Cash & Cash Equivalents"),
         ("  Restricted Cash",       False, "Restricted Cash"),
-        ("  Receivables",           False, "Receivables"),
+        ("  Receivables & Settlement Assets", False, "Receivables"),
         ("  Payables",              False, "Payables"),
         ("Total Debt",              True,  "Total Debt"),
         ("Stockholders' Equity",    True,  "Stockholders' Equity"),
@@ -1250,12 +1300,10 @@ def build_balance_sheet(
     ws.row_dimensions[BS_ROW["debt_note"]].height = 48
     c = ws.cell(row=BS_ROW["debt_note"], column=LABEL_COL)
     c.value = (
-        "⚠  Historical Total Debt is dominated by securities-lending collateral liabilities, "
-        "NOT traditional corporate borrowing. HOOD books cash received when lending customer stocks "
-        "as a balance-sheet liability. Quarterly swings of $3–4B reflect customer stock-lending "
-        "volumes, not balance-sheet stress or credit risk. "
-        "Forecast 'Total Debt' models only a corporate revolver plug; "
-        "securities-lending liabilities are not forecast."
+        "Total Debt now excludes securities-lending collateral liabilities (fixed in v2). "
+        "Historical debt = long-term borrowings + convertible notes only. "
+        "Forecast 'Total Debt' models a corporate revolver plug: "
+        "draws when FCF would push cash below the minimum balance."
     )
     c.font      = Font(name="Calibri", size=9, color="7F3F00", bold=True)
     c.fill      = PatternFill("solid", fgColor="FFF2CC")   # light amber warning
@@ -1288,7 +1336,7 @@ def build_balance_sheet(
                    end_row=BS_ROW["credit_header"],   end_column=total_cols)
 
     credit_labels = [
-        (BS_ROW["EBITDA"],         "  EBITDA (proxy: OI + SBC; forecast adds D&A) †"),
+        (BS_ROW["EBITDA"],         "  Adj. EBITDA (OI + SBC + D&A) †"),
         (BS_ROW["Debt_EBITDA"],    "  Total Debt / EBITDA"),
         (BS_ROW["NetDebt_EBITDA"], "  Net Debt / EBITDA"),
     ]
@@ -1300,15 +1348,21 @@ def build_balance_sheet(
     oi_is_r  = IS_ROW["Operating Income"]
     sbc_is_r = IS_ROW["SBC"]
 
+    da_cf_r = CF_ROW["DA"]  # D&A row on Cash Flow sheet (now has historical data from XBRL)
+
     # Historical credit metrics: cross-reference IS hist columns
     for bi in range(num_hist):
         bs_col  = HIST_COL_START + bi
         bs_let  = cl(bs_col)
         is_col  = HIST_COL_START + bi + is_hist_offset
         is_let  = cl(is_col)
+        # CF has same column count as BS, so use bs_col for CF cross-ref
+        cf_let  = cl(bs_col)
 
+        # Adj. EBITDA = OI + SBC + D&A (D&A now extracted from XBRL for historical periods)
         ebitda_f = (f"='Income Statement'!{is_let}{oi_is_r}"
-                    f"+'Income Statement'!{is_let}{sbc_is_r}")
+                    f"+'Income Statement'!{is_let}{sbc_is_r}"
+                    f"+IF(ISNUMBER('Cash Flow'!{cf_let}{da_cf_r}),'Cash Flow'!{cf_let}{da_cf_r},0)")
 
         c = ws.cell(row=BS_ROW["EBITDA"], column=bs_col)
         c.value = ebitda_f;  c.number_format = NUM_CURRENCY
@@ -1349,11 +1403,9 @@ def build_balance_sheet(
 
     credit_note_row = BS_ROW["NetDebt_EBITDA"] + 1
     style_cell(ws.cell(row=credit_note_row, column=1),
-               "† Historical EBITDA = OI + SBC (D&A not separately reported in XBRL). "
-               "Forecast EBITDA = OI + SBC + D&A (D&A = Revenue × da_pct). "
-               "Metric is therefore not directly comparable across the historical/forecast boundary. "
-               "Leverage ratios show '-' where Total Debt data is unavailable (Q2 2023). "
-               "Historical Debt/EBITDA is elevated due to securities-lending liabilities — see warning above.",
+               "† Adj. EBITDA = OI + SBC + D&A (non-GAAP). Historical D&A pulled from XBRL where available. "
+               "Forecast D&A = Revenue x da_pct. This is 'Adjusted EBITDA' per tech convention (adds back SBC). "
+               "Leverage ratios show '-' where Total Debt data is unavailable.",
                font=FONT_NOTE)
 
 
@@ -1657,11 +1709,15 @@ def build_valuation(
     exit_ebitda_ref  = cell_refs["exit_ebitda_mult"]
     exit_rev_ref     = cell_refs["exit_rev_mult"]
     shares_ref       = cell_refs["shares_diluted"]
+    mid_year_ref     = cell_refs["mid_year"]
 
     # Column letters for forecast years
     fcst_lets = [cl(is_fcst_col_start + fi) for fi in range(NUM_FCST_COLS)]   # IS
     cf_lets   = [cl(cf_fcst_col_start  + fi) for fi in range(NUM_FCST_COLS)]  # CF
     bs_lets   = [cl(bs_fcst_col_start  + fi) for fi in range(NUM_FCST_COLS)]  # BS
+
+    # Most recent actual BS column (last historical period before forecast)
+    bs_actual_let = cl(bs_fcst_col_start - 1)
 
     # Shorthand row refs
     fcf_cf_r  = CF_ROW["FCF"]
@@ -1708,23 +1764,25 @@ def build_valuation(
     c.number_format = NUM_CURRENCY; c.font = FONT_FORMULA
     c.fill = FILL_FCST; c.alignment = Alignment(horizontal="right")
 
-    # Row 7: Discount period
+    # Row 7: Discount period — mid-year convention toggle
     dp_r = fcf_r_val + 1
     style_cell(ws.cell(row=dp_r, column=1), "  Discount Period (n)", font=FONT_NOTE,
                alignment=Alignment(horizontal="left", indent=1))
     for fi in range(NUM_FCST_COLS):
         c = ws.cell(row=dp_r, column=2 + fi)
-        c.value = fi + 1; c.number_format = "0"
+        c.value = f"=IF({mid_year_ref},{fi}+0.5,{fi}+1)"
+        c.number_format = "0.0"
         c.font = FONT_NOTE; c.fill = FILL_FCST
         c.alignment = Alignment(horizontal="right")
 
-    # Row 8: Discount factor
+    # Row 8: Discount factor — uses dynamic period from row above
     df_r = dp_r + 1
     style_cell(ws.cell(row=df_r, column=1), "  Discount Factor  1/(1+WACC)^n", font=FONT_NOTE,
                alignment=Alignment(horizontal="left", indent=1))
     for fi in range(NUM_FCST_COLS):
+        dp_cell = f"{cl(2 + fi)}{dp_r}"
         c = ws.cell(row=df_r, column=2 + fi)
-        c.value = f"=1/(1+{wacc_ref})^{fi+1}"
+        c.value = f"=1/(1+{wacc_ref})^{dp_cell}"
         c.number_format = "0.000"; c.font = FONT_NOTE
         c.fill = FILL_FCST; c.alignment = Alignment(horizontal="right")
 
@@ -1760,11 +1818,11 @@ def build_valuation(
         (tv_r,   "Terminal Value  (Gordon Growth) ($M)",
                  f"=F{fcf_r_val}/({wacc_ref}-{tgr_ref})", NUM_CURRENCY, False),
         (pvtv_r, "PV of Terminal Value  ($M)  [discounted to today]",
-                 f"={cl(6)}{tv_r}/(1+{wacc_ref})^4", NUM_CURRENCY, False),
+                 f"={cl(6)}{tv_r}/(1+{wacc_ref})^E{dp_r}", NUM_CURRENCY, False),
         (ev_r,   "Enterprise Value — DCF  ($M)",
                  f"={cl(2)}{sum_r}+{cl(2)}{pvtv_r}", NUM_CURRENCY, True),
-        (nd_r,   "  (–) Net Debt FY2026E  ($M)",
-                 f"=('Balance Sheet'!{bs_lets[0]}{debt_bs_r}-'Balance Sheet'!{bs_lets[0]}{cash_bs_r})",
+        (nd_r,   "  (–) Net Debt (most recent actual)  ($M)",
+                 f"=('Balance Sheet'!{bs_actual_let}{debt_bs_r}-'Balance Sheet'!{bs_actual_let}{cash_bs_r})",
                  NUM_CURRENCY, False),
         (eqv_r,  "Equity Value — DCF  ($M)",
                  f"={cl(2)}{ev_r}-{cl(2)}{nd_r}", NUM_CURRENCY, True),
@@ -1796,8 +1854,8 @@ def build_valuation(
 
     pvtv_note = ws.cell(row=pvtv_r, column=3)
     pvtv_note.value = (
-        "Discounted to PV at time 0:  PV(TV) = TV ÷ (1 + WACC)⁴  "
-        "[end-of-year convention; 4 years from today to FY2029E terminal year]"
+        "Discounted to PV at time 0:  PV(TV) = TV ÷ (1 + WACC)^n  "
+        "[mid-year or end-of-year per Assumptions toggle]"
     )
     pvtv_note.font = FONT_NOTE
     pvtv_note.alignment = Alignment(horizontal="left", vertical="center")
@@ -1875,14 +1933,13 @@ def build_valuation(
     c5.fill = FILL_FCST; c5.alignment = Alignment(horizontal="right")
     c5.border = BORDER_BOTTOM_MED
 
-    # Net Debt — use FY2029E Net Debt discounted back 4 years at WACC to avoid
-    # timing mismatch: EV is computed at FY2029E but FY2026E debt was previously used.
+    # Net Debt — use most recent actual period (standard DCF practice: EV is
+    # point-in-time, FCFs already capture cash generation from now to terminal year)
     nd_formula = (
-        f"=('Balance Sheet'!{bs_lets[3]}{debt_bs_r}"
-        f"-'Balance Sheet'!{bs_lets[3]}{cash_bs_r})"
-        f"/(1+{wacc_ref})^4"
+        f"=('Balance Sheet'!{bs_actual_let}{debt_bs_r}"
+        f"-'Balance Sheet'!{bs_actual_let}{cash_bs_r})"
     )
-    style_cell(ws.cell(row=nd_em_r, column=1), "  (–) Net Debt FY2029E, PV @ WACC ($M)", font=FONT_FORMULA,
+    style_cell(ws.cell(row=nd_em_r, column=1), "  (–) Net Debt (most recent actual)  ($M)", font=FONT_FORMULA,
                alignment=Alignment(horizontal="left", indent=1))
     for ci in [4, 5]:
         c = ws.cell(row=nd_em_r, column=ci)
@@ -1942,11 +1999,10 @@ def build_valuation(
         c.border = BORDER_BOTTOM_MED
 
     style_cell(ws.cell(row=sum_hdr + 4, column=1),
-               "* DCF Net Debt = FY2026E Total Debt - FY2026E Cash. "
-               "Exit Multiple Net Debt = FY2029E Total Debt - FY2029E Cash, discounted back 4 years at WACC "
-               "to match the timing of the FY2029E enterprise value. "
-               "Historical debt elevated by securities-lending liabilities — see Balance Sheet note. "
-               "EBITDA = OI + SBC + D&A (D&A = Revenue x da_pct). "
+               "* Net Debt uses most recent actual Balance Sheet period (standard DCF practice). "
+               "EV is point-in-time; FCFs already capture cash generation from today to terminal year. "
+               "Adj. EBITDA = OI + SBC + D&A (non-GAAP proxy; D&A = Revenue x da_pct for forecast). "
+               "Mid-year convention toggle on Assumptions sheet. "
                "Share prices are purely illustrative; not investment advice.",
                font=FONT_NOTE)
 
@@ -1964,8 +2020,8 @@ def build_valuation(
     note4_r = sec4_row + 1
     style_cell(ws.cell(row=note4_r, column=1),
                "Implied DCF share price ($/share) at varying WACC and terminal growth rates. "
-               "FCF from Cash Flow forecast; net debt from FY2026E Balance Sheet. "
-               "Base case (WACC 12%, TGR 3%) highlighted with bold border.",
+               "FCF from Cash Flow forecast; net debt from most recent actual Balance Sheet. "
+               "Mid-year convention per Assumptions toggle. Base case (WACC 12%, TGR 3%) highlighted.",
                font=FONT_NOTE)
     ws.merge_cells(f"A{note4_r}:{cl(last_col)}{note4_r}")
 
@@ -2006,16 +2062,17 @@ def build_valuation(
                 f"'Cash Flow'!{cl(cf_fcst_col_start + fi)}{fcf_cf_r}"
                 for fi in range(NUM_FCST_COLS)
             ]
+            # Mid-year convention: discount periods from Valuation row dp_r
             pv_fcfs = "+".join(
-                f"{fcf_refs[i]}/(1+{w_ref})^{i + 1}" for i in range(NUM_FCST_COLS)
+                f"{fcf_refs[i]}/(1+{w_ref})^Valuation!{cl(2+i)}{dp_r}" for i in range(NUM_FCST_COLS)
             )
             pv_tv = (
                 f"({fcf_refs[-1]}*(1+{g_ref})"
-                f"/(({w_ref}-{g_ref})*(1+{w_ref})^{NUM_FCST_COLS}))"
+                f"/(({w_ref}-{g_ref})*(1+{w_ref})^Valuation!E{dp_r}))"
             )
             nd_formula = (
-                f"('Balance Sheet'!{bs_lets[0]}{debt_bs_r}"
-                f"-'Balance Sheet'!{bs_lets[0]}{cash_bs_r})"
+                f"('Balance Sheet'!{bs_actual_let}{debt_bs_r}"
+                f"-'Balance Sheet'!{bs_actual_let}{cash_bs_r})"
             )
             formula = f"=({pv_fcfs}+{pv_tv}-{nd_formula})/{shares_ref}"
 
@@ -2100,8 +2157,9 @@ def build_sensitivity(ws, cell_refs: dict[str, str], is_fcst_col_start: int) -> 
     ltm_ni  = f"SUM('Income Statement'!{ltm_start_col}{ni_r}:{ltm_end_col}{ni_r})"
     ltm_oth = f"SUM('Income Statement'!{ltm_start_col}{oth_r}:{ltm_end_col}{oth_r})"
 
-    sbc_ref          = cell_refs["sbc_pct"]
+    sbc_ref          = cell_refs["sbc_pct_y1"]
     da_ref           = cell_refs["da_pct"]
+    cogs_ref         = cell_refs["cogs_pct"]
     tax_ref          = cell_refs["tax_rate_y1"]
     capex_ref        = cell_refs["capex_pct"]
     other_income_ref = cell_refs["other_income"]
@@ -2178,11 +2236,12 @@ def build_sensitivity(ws, cell_refs: dict[str, str], is_fcst_col_start: int) -> 
             g_ref = f"$A{r}"
             o_ref = f"{cl(col_idx)}$6"
             tv = _total_rev(g_ref, ni_growth_ref, other_growth_ref)
-            # FCF = OI − Tax + Other Income + SBC add-back + D&A add-back − Capex
-            # OI = tv*(1−opex−sbc);  Tax applied to OI only (BTL is post-tax)
+            # FCF = OI - Tax + Other Income + SBC add-back + D&A add-back - Capex
+            # Gross Profit = tv*(1-cogs); OI = GP - opex*tv - sbc*tv
+            oi_expr = f"{tv}*(1-{cogs_ref})-{tv}*{o_ref}-{tv}*{sbc_ref}"
             fcf_formula = (
-                f"={tv}*(1-{o_ref}-{sbc_ref})"
-                f"-MAX({tv}*(1-{o_ref}-{sbc_ref}),0)*{tax_ref}"
+                f"={oi_expr}"
+                f"-MAX({oi_expr},0)*{tax_ref}"
                 f"+{other_income_ref}"
                 f"+{tv}*{sbc_ref}"
                 f"+{tv}*{da_ref}"
@@ -2226,10 +2285,11 @@ def build_sensitivity(ws, cell_refs: dict[str, str], is_fcst_col_start: int) -> 
             g_ref = f"$A{r}"
             o_ref = f"{cl(col_idx)}$15"
             tv = _total_rev(g_ref, ni_growth_ref, other_growth_ref)
-            # NI = OI − Tax + Other Income  (Other Income is post-tax / below-the-line)
+            # NI = OI - Tax + Other Income
+            oi_expr = f"{tv}*(1-{cogs_ref})-{tv}*{o_ref}-{tv}*{sbc_ref}"
             ni_formula = (
-                f"={tv}*(1-{o_ref}-{sbc_ref})"
-                f"-MAX({tv}*(1-{o_ref}-{sbc_ref}),0)*{tax_ref}"
+                f"={oi_expr}"
+                f"-MAX({oi_expr},0)*{tax_ref}"
                 f"+{other_income_ref}"
             )
             c = ws.cell(row=r, column=col_idx)
@@ -2303,7 +2363,7 @@ def build_checks_section(
     Validates internal consistency across all three statements:
       1. IS Revenue Sum: Verifies Total Revenue = Txn + NI + Other
       2. IS Costs: Verifies Total Costs = OpEx (ex-SBC) + SBC
-      3. Net Income Formula: NI = OI - Taxes + Below-the-line
+      3. Net Income Formula: NI = OI - Tax Provision + Other Income
       4. BS Check: Partial Assets ≈ Partial L+E (non-zero due to excluded items)
       5. CF Check: Ending Cash = Prior + FCF + ΔDebt  (Cash Bridge)
 
@@ -2649,10 +2709,10 @@ def build_model_guide(ws) -> None:
     nav_rows = [
         ("Model Guide",          "This sheet — navigation and reference"),
         ("Assumptions",          "All model inputs (blue/yellow cells). Edit here to change the model."),
-        ("Income Statement",     "14 quarters actuals + 4-year forecast. Per-segment revenue, EPS, margins."),
-        ("Balance Sheet",        "Cash rolls from FCF; Debt = revolver plug; Equity += Net Income each year."),
-        ("Cash Flow",            "CFO = NI + SBC + D&A − ΔWC; FCF = CFO − Capex."),
-        ("Valuation",            "DCF (Gordon Growth), exit multiples, WACC sensitivity."),
+        ("Income Statement",     "14Q actuals + 4Y forecast. COGS, gross profit, per-segment revenue, margins."),
+        ("Balance Sheet",        "Cash rolls from FCF; Debt = revolver plug; Equity += NI each year."),
+        ("Cash Flow",            "CFO = NI + SBC + D&A; FCF = CFO - Capex. Historical D&A from XBRL."),
+        ("Valuation",            "DCF (mid-year toggle), exit multiples (EBITDA + Revenue), WACC sensitivity."),
         ("Sensitivity Analysis", "5x5 tables: FCF / NI / Revenue across growth & cost inputs."),
     ]
 
@@ -2694,10 +2754,14 @@ def build_model_guide(ws) -> None:
     key_assumptions = [
         ("Txn Rev Growth FY2026E",         "30%",  "10%-50%",  "Driven by crypto/equities volumes"),
         ("Net Interest Rev Growth FY2026E", "15%",  "0%-30%",   "Sensitive to Fed funds rate"),
-        ("OpEx % of Revenue",              "42%",  "30%-55%",  "Excludes SBC"),
-        ("Effective Tax Rate FY2026E",     "5%",   "0%-25%",   "NOL carryforward ~$2B"),
+        ("COGS % of Revenue",             "15%",  "10%-25%",  "Txn rebates, clearing, execution costs"),
+        ("OpEx % (steps down FY26-29)",    "42-37%", "30%-55%", "Reflects operating leverage thesis"),
+        ("SBC % (steps down FY26-29)",     "7-6%", "4%-10%",   "Declining as revenue scales"),
+        ("Effective Tax Rate FY2026E",     "5%",   "0%-25%",   "NOL carryforward ~$2B; ramps to 21%"),
         ("WACC",                           "12%",  "8%-16%",   "See WACC sensitivity in Valuation"),
-        ("Terminal Growth Rate",           "3%",   "1%-5%",    "Must be < WACC"),
+        ("Terminal Growth Rate",           "3%",   "1%-5%",    "Retail investing + crypto secular growth"),
+        ("Capex % of Revenue",            "1.0%", "0.3%-2%",  "Data centers, tech infrastructure"),
+        ("Mid-Year Convention",           "Yes",   "Yes/No",   "Toggle on Assumptions sheet"),
     ]
 
     for i, (driver, default, rng, notes) in enumerate(key_assumptions):
@@ -2724,9 +2788,21 @@ def build_model_guide(ws) -> None:
 
     limitations = [
         "1.  D&A is modeled as % of revenue, not an asset depreciation schedule.",
-        "2.  Working Capital % assumptions calibrated to historical averages; include brokerage settlement flows.",
-        "3.  Total Debt historically elevated by securities-lending liabilities — not corporate debt.",
+        "2.  Working Capital: 'Receivables & Settlement Assets' includes brokerage settlement receivables, "
+        "margin loans, and user receivables (high ratio vs. typical operating co is expected).",
+        "3.  Total Debt now excludes securities-lending collateral liabilities (removed in v2). "
+        "Prior versions double-counted these as corporate debt.",
         "4.  Share count is static; does not model incremental SBC dilution or option exercises.",
+        "5.  Q4 2025 Balance Sheet is forward-filled from Q3 2025 (10-K not yet filed at build time). "
+        "Update BS when Q4 2025 10-K is available.",
+        "6.  Segment revenue is unavailable for Q3 2022, Q4 2022, and partially Q1 2023 "
+        "(pre-reporting / XBRL sparsity). Cells left blank intentionally.",
+        "7.  Q4 2022 Cash Flow Statement (SBC, CFO, Capex, FCF) is sparse in XBRL; "
+        "left blank rather than estimated.",
+        "8.  Terminal Growth Rate at 3% reflects HOOD's position in structurally growing markets "
+        "(retail investing penetration, crypto adoption) with pricing power from network effects.",
+        "9.  Adj. EBITDA = OI + SBC + D&A (non-GAAP). Standard tech/fintech convention. "
+        "Not equivalent to GAAP EBITDA (NI + Tax + Interest + D&A).",
     ]
 
     for lim_text in limitations:
@@ -2841,8 +2917,11 @@ def main() -> None:
         "other_growth_y1": (*_GROWTH_BOUNDS, True), "other_growth_y2": (*_GROWTH_BOUNDS, True),
         "other_growth_y3": (*_GROWTH_BOUNDS, True), "other_growth_y4": (*_GROWTH_BOUNDS, True),
         # Cost structure (percentages of revenue)
-        "opex_pct":      (*_PCT_BOUNDS, True),
-        "sbc_pct":       (*_PCT_BOUNDS, True),
+        "cogs_pct":      (*_PCT_BOUNDS, True),
+        "opex_pct_y1":   (*_PCT_BOUNDS, True), "opex_pct_y2": (*_PCT_BOUNDS, True),
+        "opex_pct_y3":   (*_PCT_BOUNDS, True), "opex_pct_y4": (*_PCT_BOUNDS, True),
+        "sbc_pct_y1":    (*_PCT_BOUNDS, True), "sbc_pct_y2":  (*_PCT_BOUNDS, True),
+        "sbc_pct_y3":    (*_PCT_BOUNDS, True), "sbc_pct_y4":  (*_PCT_BOUNDS, True),
         "da_pct":        (*_PCT_BOUNDS, True),
         "capex_pct":     (*_PCT_BOUNDS, True),
         # Tax rates

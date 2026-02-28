@@ -78,8 +78,10 @@ LABEL_MAP: dict[str, str] = {
     "Other Revenue":                 "Other Revenue",
     # Income Statement — totals & costs
     "Total Revenue":                 "Total Revenue",
+    "Cost of Revenue":               "Cost of Revenue",
     "Operating Expenses":            "Operating Expenses",
     "Stock-Based Compensation":      "Stock-Based Compensation",
+    "Tax Provision":                 "Tax Provision",
     "Net Income":                    "Net Income",
     # Balance Sheet
     "Cash & Equivalents":            "Cash & Cash Equivalents",
@@ -89,6 +91,7 @@ LABEL_MAP: dict[str, str] = {
     "Total Debt (Proxy)":            "Total Debt",
     "Total Equity":                  "Stockholders' Equity",
     # Cash Flow
+    "Depreciation & Amortization":   "Depreciation & Amortization",
     "Cash From Operations (CFO)":    "Cash from Operations",
     "Capex (Productive Assets)":     "Capital Expenditures",
     "Free Cash Flow":                "Free Cash Flow",
@@ -103,8 +106,10 @@ ROW_ORDER: dict[str, list[str]] = {
         "Net Interest Revenue",
         "Other Revenue",
         "Total Revenue",
+        "Cost of Revenue",
         "Operating Expenses",
         "Stock-Based Compensation",
+        "Tax Provision",
         "Net Income",
     ],
     "BS": [
@@ -118,6 +123,7 @@ ROW_ORDER: dict[str, list[str]] = {
     "CF": [
         "Net Income",
         "Stock-Based Compensation",
+        "Depreciation & Amortization",
         "Cash from Operations",
         "Capital Expenditures",
         "Free Cash Flow",
@@ -297,11 +303,60 @@ def load_and_transform(filepath: str, stmt: str) -> pd.DataFrame:
     #    (SEC XBRL data is typically in raw dollars; our model operates in millions)
     df = (df / 1_000_000).round(1)
 
-    # 5. Forward-fill sparse quarters (Balance Sheet only).
-    #    Balance Sheet accounts are snapshots; if Q2 is missing but Q1 has a value,
-    #    assume Q2 carried the same amount forward. This does NOT apply to Income
-    #    Statement or Cash Flow, which measure period activity and require actual
-    #    reported values (forward-filling would overstate actual period performance).
+    # 5a. Derive Q4 segment revenue via proportional allocation (IS only).
+    #     XBRL has Total Revenue for Q4 (from 10-K) but segment breakdowns
+    #     (Txn, NI Rev, Other) come from 10-Q XLSX note schedules which don't
+    #     cover Q4. For Q4 columns where Total Revenue exists but segments are
+    #     NaN, allocate Total Revenue using the average segment mix from the
+    #     preceding Q1-Q3 of the same fiscal year.
+    if stmt == "IS":
+        _seg_labels = ["Transaction-based Revenue", "Net Interest Revenue", "Other Revenue"]
+        _total_label = "Total Revenue"
+        if _total_label in df.index and all(s in df.index for s in _seg_labels):
+            for col in df.columns:
+                _dt = col
+                _has_total = pd.notna(df.loc[_total_label, col]) and df.loc[_total_label, col] != 0
+                _segs_missing = all(pd.isna(df.loc[s, col]) for s in _seg_labels)
+                if _has_total and _segs_missing and hasattr(_dt, 'month') and _dt.month == 12:
+                    # Find Q1-Q3 of the same fiscal year
+                    yr = _dt.year
+                    _q13_cols = [c for c in df.columns
+                                 if hasattr(c, 'year') and c.year == yr and c.month != 12]
+                    if _q13_cols:
+                        _q13_totals = df.loc[_total_label, _q13_cols].apply(
+                            pd.to_numeric, errors="coerce"
+                        )
+                        _q4_total = df.loc[_total_label, col]
+                        for seg in _seg_labels:
+                            _q13_seg = df.loc[seg, _q13_cols].apply(
+                                pd.to_numeric, errors="coerce"
+                            )
+                            _valid = _q13_totals.notna() & _q13_seg.notna() & (_q13_totals != 0)
+                            if _valid.sum() >= 2:
+                                _share = (_q13_seg[_valid] / _q13_totals[_valid]).mean()
+                                df.loc[seg, col] = round(_q4_total * _share, 1)
+                        # Reconcile: adjust "Other Revenue" so segments sum to Total
+                        _seg_sum = sum(df.loc[s, col] for s in _seg_labels
+                                       if pd.notna(df.loc[s, col]))
+                        _residual = round(_q4_total - _seg_sum, 1)
+                        if abs(_residual) > 0.05:
+                            df.loc["Other Revenue", col] = round(
+                                (df.loc["Other Revenue", col] or 0) + _residual, 1
+                            )
+                        logger.info(
+                            "  [IS] Derived Q4 %d segment revenue via proportional allocation "
+                            "(Total=%.1fM, Txn=%.1fM, NI=%.1fM, Other=%.1fM)",
+                            yr, _q4_total,
+                            df.loc["Transaction-based Revenue", col],
+                            df.loc["Net Interest Revenue", col],
+                            df.loc["Other Revenue", col],
+                        )
+
+    # 5b. Forward-fill sparse quarters (Balance Sheet only).
+    #     Balance Sheet accounts are snapshots; if Q2 is missing but Q1 has a value,
+    #     assume Q2 carried the same amount forward. This does NOT apply to Income
+    #     Statement or Cash Flow, which measure period activity and require actual
+    #     reported values (forward-filling would overstate actual period performance).
     if stmt in FFILL_STATEMENTS:
         df = df.ffill(axis=1)
 

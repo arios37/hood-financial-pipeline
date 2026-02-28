@@ -100,27 +100,30 @@ IS_ROW: dict[str, int] = {
     "NI Revenue":            6,   # Net Interest Revenue (segment)
     "Other Revenue":         7,   # Other Revenue (segment)
     "Total Revenue":         8,
-    "sep_costs":             9,
-    "Operating Expenses":   10,   # shown net of SBC
-    "SBC":                  11,
-    "Total Costs":          12,
-    "sep_oi":               13,
-    "Operating Income":     14,
-    "Tax Provision":        15,
-    "Below-the-line":       16,   # NI − OI (historical plug for non-operating items)
-    "sep_ni":               17,
-    "Net Income":           18,
-    "EPS":                  19,   # diluted EPS (forecast only)
-    "sep_margin":           20,
-    "margin_header":        21,
-    "Op Margin":            22,
-    "Net Margin":           23,
-    "FCF Margin":           24,   # FCF / Revenue (forecast only)
-    "SBC Pct":              25,   # SBC as % of Revenue
-    "OpEx Pct":             26,   # Op. Exp. (ex. SBC) as % of Revenue
-    "sep_ltm":              27,   # thin separator before LTM memo
-    "LTM Revenue":          28,   # memo: trailing-12-month revenue
-    "Implied Growth":       29,   # implied revenue growth %
+    "Cost of Revenue":       9,   # COGS: transaction rebates, clearing, execution
+    "Gross Profit":         10,   # Total Revenue − Cost of Revenue
+    "sep_costs":            11,
+    "Operating Expenses":   12,   # shown net of SBC
+    "SBC":                  13,
+    "Total Costs":          14,
+    "sep_oi":               15,
+    "Operating Income":     16,
+    "Tax Provision":        17,
+    "Other Income":         18,   # non-operating items (interest income, crypto gains)
+    "sep_ni":               19,
+    "Net Income":           20,
+    "EPS":                  21,   # diluted EPS (forecast only)
+    "sep_margin":           22,
+    "margin_header":        23,
+    "Gross Margin":         24,   # Gross Profit / Revenue
+    "Op Margin":            25,
+    "Net Margin":           26,
+    "FCF Margin":           27,   # FCF / Revenue (forecast only)
+    "SBC Pct":              28,   # SBC as % of Revenue
+    "OpEx Pct":             29,   # Op. Exp. (ex. SBC) as % of Revenue
+    "sep_ltm":              30,   # thin separator before LTM memo
+    "LTM Revenue":          31,   # memo: trailing-12-month revenue
+    "Implied Growth":       32,   # implied revenue growth %
 }
 
 # ---------------------------------------------------------------------------
@@ -145,7 +148,7 @@ BS_ROW: dict[str, int] = {
     "debt_note":      16,   # footnote explaining debt proxy composition
     "sep_credit":     18,
     "credit_header":  19,
-    "EBITDA":         20,   # rolling LTM EBITDA for leverage ratios
+    "EBITDA":         20,   # rolling LTM Adjusted EBITDA (OI + SBC + D&A)
     "Debt_EBITDA":    21,   # Total Debt / EBITDA
     "NetDebt_EBITDA": 22,   # (Debt − Cash) / EBITDA
 }
@@ -160,7 +163,7 @@ BS_ROW: dict[str, int] = {
 CF_ROW: dict[str, int] = {
     "Net Income":     4,
     "SBC":            5,
-    "DA":             6,    # D&A add-back (forecast only; not in XBRL)
+    "DA":             6,    # D&A add-back (historical from XBRL + forecast)
     "CFO":            7,
     "Capex":          8,
     "FCF":            9,
