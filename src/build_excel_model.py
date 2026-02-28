@@ -1714,7 +1714,7 @@ def build_valuation(
     # Column letters for forecast years
     fcst_lets = [cl(is_fcst_col_start + fi) for fi in range(NUM_FCST_COLS)]   # IS
     cf_lets   = [cl(cf_fcst_col_start  + fi) for fi in range(NUM_FCST_COLS)]  # CF
-    bs_lets   = [cl(bs_fcst_col_start  + fi) for fi in range(NUM_FCST_COLS)]  # BS
+    _          = [cl(bs_fcst_col_start  + fi) for fi in range(NUM_FCST_COLS)]  # BS (reserved)
 
     # Most recent actual BS column (last historical period before forecast)
     bs_actual_let = cl(bs_fcst_col_start - 1)
